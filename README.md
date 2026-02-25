@@ -117,15 +117,16 @@ Alle tre opsparingsprodukter (ratepension, livrente og aldersopsparing) er **uni
 
 ### Notation
 
-|Symbol          |Beskrivelse                                                              |
-|----------------|-------------------------------------------------------------------------|
-|$D_t$           |Depotværdi ved starten af måned $t$                                      |
-|$\pi$           |Månedlig bruttopræmie                                                    |
-|$\delta_{liv,t}$|Månedlig livsforsikringspræmie (se ovenfor)                              |
-|$\alpha$        |Månedlig depotomkostningsprocent (f.eks. 0,10 % / md.)                  |
-|$r_t$           |Realiseret månedligt investeringsafkast                                  |
-|$\mu_t$         |Månedlig dødelighedsintensitet: $\mu(x+t)/12$ (kun livrente, se nedenfor)|
-|$U_t$           |Udbetaling i måneden (0 i opsparingsperioden)                            |
+|Symbol                 |Beskrivelse                                                                      |
+|-----------------------|---------------------------------------------------------------------------------|
+|$D_t$                  |Depotværdi ved starten af måned $t$                                              |
+|$\pi$                  |Månedlig bruttopræmie                                                            |
+|$\delta_{liv,t}$       |Månedlig livsforsikringspræmie (se ovenfor)                                      |
+|$\alpha$               |Månedlig depotomkostningsprocent (f.eks. 0,10 % / md.)                          |
+|$r_t$                  |Realiseret månedligt investeringsafkast                                          |
+|$\mu_t$                |Månedlig dødelighedsintensitet: $\mu(x+t)/12$ (kun livrente, se nedenfor)        |
+|$\ddot{a}_{x+t}$       |1-krones passiv: $\text{annuityPV}(x+t,\, r)$ — nutidsværdi af 1 kr/år livslangt|
+|$U_t$                  |Udbetaling i måneden (0 i opsparingsperioden)                                    |
 
 ### Fremregningsformel
 
@@ -140,6 +141,12 @@ I Thieles differentialligning fremgår dødelighedsgevinsten af leddet $-\mu(t)\
 $$D_{t+1} = \Bigl(D_t + \pi - \delta_{liv,t}\Bigr) \cdot (1 + r_t + \mu_t) \cdot (1 - \alpha) - U_t$$
 
 I opsparingsperioden gælder ratepensionsformlen for alle produkter, fordi depotet udbetales ved dødsfald og nettoresikoen er nul.
+
+**Dynamisk ydelse for livrente** — $U_t$ er *ikke* fastsat én gang ved konvertering, men genberegnes hver måned ud fra det aktuelle depot og det aktuelle 1-krones passiv:
+
+$$U_t = \frac{D_t}{\ddot{a}_{x+t} \cdot 12}$$
+
+$\ddot{a}_{x+t} = \text{annuityPV}(x+t,\, r)$ er nutidsværdien af at udbetale 1 kr/år livslangt til en person i alder $x+t$. Divideres det aktuelle depot med dette tal, fås netop den ydelse der — i forventning — tømmer depotet præcis ved dødstidspunktet. Systemet er selvjusterende: opnår investeringen et højt afkast stiger $D_t$ og dermed $U_t$; jo ældre forsikrede bliver, jo mindre er $\ddot{a}_{x+t}$, og jo højere bliver $U_t$ relativt til depot — depotet udtyndes gradvist men altid i takt med forventet restlevetid.
 
 PAL-skatten fratrækkes **ikke** depotet i fremregningen. Den opgøres separat som en løbende acontoforpligtelse (se nedenfor).
 
@@ -163,7 +170,9 @@ $$\text{PAL}*t^{\text{aconto}} = \text{PAL}*{t-1}^{\text{aconto}} + \text{PAL}_t
 Forpligtelsen nulstilles ved den faktiske afregning til SKAT. Ved negativt afkast bidrager måneden med nul, men der opstår et fremførselsberettiget underskud der reducerer fremtidige PAL-betalinger.
 
 **5. Udbetaling:**
-I opsparingsperioden er $U_t = 0$. I udbetalingsperioden udbetales den aftalte ydelse — for ratepension en fast månedlig rate, for livrente en livsvarig ydelse fastsat ved konverteringstidspunktet.
+I opsparingsperioden er $U_t = 0$.
+- **Ratepension/aldersopsparing:** $U_t$ er en fast månedlig rate beregnet én gang ved konvertering (annuitetsprincip).
+- **Livrente:** $U_t$ genberegnes *hver måned* som $D_t / (\ddot{a}_{x+t} \cdot 12)$, hvor $\ddot{a}_{x+t} = \text{annuityPV}(x+t, r)$ opdateres for aktuel alder $x+t$. Ydelsen varierer svagt fra måned til måned, men depotet kan ikke løbe tør (i forventning).
 
 ### Eksempel A — opsparingsperiode (alle produkter, 1 måned)
 
@@ -178,20 +187,39 @@ Antag: $D_0 = 500.000$ kr., $\pi = 3.000$ kr., alder 40 år, dækningssum 500.00
 |**Depot ved månedsslut**              |                                  |**506.441 kr.**|
 |PAL-skat (bogholderi, ikke fratrukket)|(0,153 / 12) × (502.925 × 0,0080) |51 kr.         |
 
-### Eksempel B — udbetalingsperiode, livrente (med dødelighedsgevinster, 1 måned)
+### Eksempel B — udbetalingsperiode, livrente (dynamisk ydelse + dødelighedsgevinster, 1 måned)
 
-Antag: $D_0 = 2.000.000$ kr., alder 70 år, $\mu_{70} = 0{,}02$ pr. år (Gompertz-Makeham), $\alpha = 0{,}10\,\%$, $r_0 = 0{,}40\,\%$, månedlig ydelse $U = 12.000$ kr.
+Antag: $D_0 = 2.000.000$ kr., alder 70 år, $r = 4\,\%$ p.a., $\mu_{70} = 0{,}02$ pr. år (Gompertz-Makeham), $\alpha = 0{,}10\,\%$, $r_0 = 0{,}40\,\%$ (månedligt afkast).
 
-|Trin                                       |Beregning                                            |Resultat          |
-|-------------------------------------------|-----------------------------------------------------|------------------|
-|Dødelighedsgevinst ($\mu_t = 0{,}02/12$)  |2.000.000 × (1 + 0,02/12)                           |2.003.333 kr.     |
-|Efter afkast (0,40 %)                      |2.003.333 × 1,0040                                   |2.011.347 kr.     |
-|Depotomkostning (0,10 %)                   |2.011.347 × (1 − 0,0010)                             |2.009.335 kr.     |
-|Udbetaling                                 |2.009.335 − 12.000                                   |1.997.335 kr.     |
-|**Depot ved månedsslut**                   |                                                     |**1.997.335 kr.** |
-|**Uden dødelighedsgevinst (fejl)**         |2.000.000 × 1,0040 × 0,9990 − 12.000                |**1.988.008 kr.** |
+**Trin 0 — beregn månedens ydelse via 1-krones passivet:**
 
-Dødelighedsgevinsten bidrager med ca. **9.327 kr.** i dette eksempel — svarende til ca. 78 % af den månedlige ydelse. Ved høj alder, hvor $\mu_t$ er stor, kan gevinsten overstige ydelsen, hvilket er det aktuarmæssige grundlag for, at selskabet kan udbetale livrente på ubestemt tid.
+$$\ddot{a}_{70} = \text{annuityPV}(70,\; 0{,}04) \approx 13{,}2 \text{ år}$$
+
+$$U_0 = \frac{2.000.000}{13{,}2 \times 12} \approx 12.626 \text{ kr./md.}$$
+
+**Depot-fremregning:**
+
+|Trin                                            |Beregning                             |Resultat          |
+|------------------------------------------------|--------------------------------------|------------------|
+|Dødelighedsgevinst ($\mu_t = 0{,}02/12$)       |2.000.000 × (1 + 0,02/12)             |2.003.333 kr.     |
+|Efter afkast (0,40 %)                           |2.003.333 × 1,0040                    |2.011.347 kr.     |
+|Depotomkostning (0,10 %)                        |2.011.347 × (1 − 0,0010)              |2.009.335 kr.     |
+|Udbetaling (dynamisk $U_0$)                     |2.009.335 − 12.626                    |1.996.709 kr.     |
+|**Depot ved månedsslut**                        |                                      |**1.996.709 kr.** |
+
+**Næste måned** opdateres $U_1$ med nyt depot og alder 70 år + 1 md.:
+
+$$\ddot{a}_{70\frac{1}{12}} \approx 13{,}18 \text{ år}, \quad U_1 = \frac{1.996.709}{13{,}18 \times 12} \approx 12.626 \text{ kr./md.}$$
+
+Ydelsen er næsten uændret — i forventning holder depotet netop til dødstidspunktet, fordi $\ddot{a}_{x+t}$ og $\mu_t$ er kalibreret mod samme dødelighedsmodel.
+
+**Sammenligning — hvad går galt uden dynamisk ydelse og/eller dødelighedsgevinster:**
+
+|Variant                                   |Depot efter 1 måned|
+|------------------------------------------|-------------------|
+|Korrekt: dynamisk $U$ + dødelighedsgevinst|1.996.709 kr.      |
+|Fast $U=12.626$ men ingen dødelighedsgevinst|1.988.691 kr.    |
+|Fast $U=12.626$ og ingen dødelighedsgevinst, men alder stiger → $U$ fastlåst|løber tør|
 
 ### Sammenligning af produkternes mekanik
 
@@ -203,6 +231,7 @@ Dødelighedsgevinsten bidrager med ca. **9.327 kr.** i dette eksempel — svaren
 |Udbetalingsform                         |Rate over min. 10 år     |Livsvarig ydelse             |Rate eller engangsudbetaling|
 |Overlevelsesgevinster (dødelighedsgevinster)|Nej                  |Ja — $+\mu_t D_t$ pr. måned  |Nej                         |
 |Fremregning i udbetalingsperioden       |$(1+r_t)$                |$(1+r_t+\mu_t)$              |$(1+r_t)$                   |
+|Ydelse $U_t$ i udbetalingsperioden      |Fast (beregnet ved konvertering)|Dynamisk: $D_t/(\ddot{a}_{x+t}\cdot 12)$|Fast (beregnet ved konvertering)|
 |Depotopbygning i opsparingsperioden     |Identisk                 |Identisk                     |Identisk                    |
 
 Selve depotmekanikken er **identisk** for alle tre produkter. Forskellen ligger i skattebehandlingen af ind- og udbetalinger, i konverteringsreglerne ved pensionsalder — og for livrentens vedkommende i adgangen til overlevelsesgevinster, som er det aktuarmæssige fundament for produktets overlegenhed ved meget høj levealder.
