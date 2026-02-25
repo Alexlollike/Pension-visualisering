@@ -558,9 +558,15 @@
       const opts = chart.options._pensionsAlder;
       if (opts == null) return;
       const lbls = chart.data.labels;
-      const idx  = lbls.indexOf(String(Math.round(opts)));
-      if (idx === -1) return;
-      const xPx = chart.scales.x.getPixelForValue(idx);
+      // Labels er formateret med én decimal ("67.0"), så vi finder det
+      // nærmeste label frem for at sammenligne strenge direkte.
+      let bestIdx = -1, bestDiff = Infinity;
+      for (let i = 0; i < lbls.length; i++) {
+        const diff = Math.abs(parseFloat(lbls[i]) - opts);
+        if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
+      }
+      if (bestIdx === -1 || bestDiff > 1) return;
+      const xPx = chart.scales.x.getPixelForValue(bestIdx);
       const ctx  = chart.ctx;
       ctx.save();
       ctx.strokeStyle = '#dc2626';
@@ -691,7 +697,6 @@
       labels.push(alder.toFixed(1));
 
       const erPension = (t >= akkMdr);
-      const erTransition = (t >= akkMdr - trin && t <= akkMdr);
 
       if (!erPension) {
         ds0.push(depot);
