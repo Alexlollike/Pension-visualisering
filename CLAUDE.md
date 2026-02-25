@@ -101,27 +101,41 @@ function stepDepot(D, pi, delta_liv, r_monthly, alpha, U) {
 }
 ```
 
-#### Livrente i udbetalingsperioden (med dødelighedsgevinster)
+#### Livrente i udbetalingsperioden (med dødelighedsgevinster + dynamisk ydelse)
 I Thieles differentialligning fremgår dødelighedsgevinsten af leddet `-μ(t)·D(t)`, der
 beskriver overdragelsen af depot fra afdøde til overlevende forsikringstagere. Set fra den
-overlevende forsikringstagers synsvinkel tilføjer dette `+μ_t·D_t` til depotet pr. måned:
+overlevende forsikringstagers synsvinkel tilføjer dette `+μ_t·D_t` til depotet pr. måned.
+
+Ydelsen U er **ikke** fast ved konvertering — den genberegnes hver måned som
+`D / (annuityPV(x_current, r_annual) * 12)` ("1-krones passivet"). Det sikrer at depotet
+aldrig løber tør i forventning, uanset faktisk levetid og afkast.
 
 ```js
-function stepDepotLivrente(D, r_monthly, mu_annual, alpha, U) {
-  // mu_annual = hazard(x + t)  — den årlige dødelighedsintensitet for nuværende alder
+function stepDepotLivrente(D, r_monthly, mu_annual, alpha, x_current, r_annual) {
+  // mu_annual = hazard(x_current) — den årlige dødelighedsintensitet for nuværende alder
+  // x_current stiger med 1/12 pr. måned
   // I opsparingsperioden bruges stepDepot() ovenfor (ingen dødelighedsgevinst).
   const mu_monthly = mu_annual / 12;
+  const U = D / (annuityPV(x_current, r_annual) * 12); // dynamisk ydelse via 1-krones passiv
   return D * (1 + r_monthly + mu_monthly) * (1 - alpha) - U;
 }
 ```
 
-**Uden dødelighedsgevinster (fejl):** `D * (1 + r_monthly) * (1 - alpha) - U`
-→ Depotet falder for hurtigt til nul, fordi ydelsen ikke modsvares af den tilstrømmende
-dødelighedsgevinst fra afdøde forsikringstagere.
+**FEJL — fast U ved konvertering, ingen dødelighedsgevinst:**
+`D * (1 + r_monthly) * (1 - alpha) - U_fast`
+→ Depotet falder for hurtigt til nul: ydelsen er ikke justeret til alder, og
+dødelighedsgevinsten fra afdøde forsikringstagere mangler.
 
-**Med dødelighedsgevinster (korrekt):** `D * (1 + r_monthly + mu_monthly) * (1 - alpha) - U`
-→ Ved høj alder (stor μ) kan dødelighedsgevinsten overstige ydelsen, så depotet
-stabiliseres eller vokser — det aktuarmæssige fundament for livrenten.
+**FEJL — dødelighedsgevinst tilstede, men U stadig fast:**
+`D * (1 + r_monthly + mu_monthly) * (1 - alpha) - U_fast`
+→ Bedre, men U afspejler ikke den faktiske restlevetid. Depot kan stadig løbe tør eller
+akkumulere uhensigtsmæssigt ved lang levetid.
+
+**KORREKT — dødelighedsgevinst + dynamisk U via 1-krones passiv:**
+`D * (1 + r_monthly + mu_monthly) * (1 - alpha) - D / (annuityPV(x_current, r) * 12)`
+→ Systemet er selvjusterende. Depot kan aldrig løbe tør i forventning.
+→ Ved høj alder (stor μ) stabiliseres eller vokser depotet — det aktuarmæssige fundament
+  for livrenten.
 
 ## Design-principper
 
@@ -147,3 +161,7 @@ stabiliseres eller vokser — det aktuarmæssige fundament for livrenten.
 - **Fremregning:** Brug `stepDepotLivrente()` (ikke `stepDepot()`) for livrente i
   udbetalingsperioden — ellers falder depotet for hurtigt til nul pga. manglende
   dødelighedsgevinster
+- **Dynamisk ydelse:** Livrenteydelsen `U` skal **ikke** sættes fast ved konvertering.
+  Genberegn den hver måned som `D / (annuityPV(x_current, r) * 12)` — det er
+  "1-krones passivet" der sikrer at depot og ydelse altid er i balance med forventet
+  restlevetid
