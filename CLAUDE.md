@@ -1,182 +1,149 @@
-# CLAUDE.md — Pension-visualisering
+# CLAUDE.md – Instruktioner til Claude Code
 
 ## Projektbeskrivelse
 
-Dette projekt er en **interaktiv HTML-visualisering af pensionsdepotudvikling** for danske pensionspolicer. Systemet fremregner depotværdier måned for måned og præsenterer resultatet som én selvstændig HTML-fil med grafer og interaktive parametre.
+Du bygger en dansk, interaktiv pension-visualiseringshjemmeside. Målgruppen er almindelige danskere der gerne vil forstå deres pensionsbeslutninger. Tonen er venlig, pædagogisk og ikke-finansiel-jargon.
 
-- **Output:** Én selvstændig `pension.html` (ingen build-step, ingen npm, kører direkte i browser)
-- **Teknologi:** Vanilla JavaScript + [Chart.js](https://www.chartjs.org/) eller [Plotly.js](https://plotly.com/javascript/) via CDN
-- **Formål:** Aktuarmæssig fremregningsmodel til illustration og indberetning (Finanstilsynet)
-- **Sprog i kode og kommentarer:** Dansk
+Hjemmesiden er **ikke** et rådgivningsværktøj. Den viser konsekvenser af beslutninger, ikke anbefalinger.
 
----
+## Byggerækkefølge (følg denne rækkefølge!)
 
-## De fire produkter
+### Fase 1 – Grundstruktur ✅ TODO
+- [ ] Opsæt Vite + React + Tailwind + Recharts
+- [ ] Lav `App.jsx` med navigation mellem de tre sektioner
+- [ ] Implementer dansk tekst fra `src/content/text.da.js`
+- [ ] Lav simpelt, rent layout (hvid baggrund, sans-serif, god læsbarhed)
 
-| Produkt | Type | Præmiefradrag | Skattefri udbetaling | Overlevelsesgevinster |
-|---|---|---|---|---|
-| Ratepension | Opsparing (10–30 år) | Ja (op til loft) | Nej | Nej |
-| Livrente | Opsparing (livsvarig) | Ja (ubegrænset) | Nej | **Ja** |
-| Aldersopsparing | Opsparing | Nej | **Ja** | Nej |
-| Livsforsikring | Rent risikotillæg | — | — | — |
+### Fase 2 – Sektion 1: Indbetaling og pensionsalder
+- [ ] Inputfelter: alder, løn, nuværende opsparing, indbetalingsprocent, pensionsalder
+- [ ] Beregning: opsparing ved pension (risikofri rente, ingen afkast-usikkerhed)
+- [ ] Graf: opsparing over tid som kurve
+- [ ] Formel vist tydeligt: `S(t) = S_0 * (1+r)^t + P * Σ(1+r)^i`
 
-**Vigtig pointe:** Depot-mekanikken er **identisk** for alle tre opsparingsprodukter. Forskellen ligger i skattebehandling, konverteringsregler og adgang til overlevelsesgevinster.
+### Fase 3 – Sektion 2: Produktsammensætning
+- [ ] Slider: fordeling mellem alderspension / ratepension / livrente (sum = 100%)
+- [ ] For ratepension: vælg udbetalingsperiode (5, 10, 15, 20 år eller til død)
+- [ ] For livrente: brug Gompertz-Makeham til at beregne forventet ydelse
+- [ ] Vis månedlig ydelse for hvert produkt side om side
+- [ ] Vis "overlevelsesgevinst" – hvad tjener du på at overleve?
+- [ ] Graf: kumulativ udbetaling over alder (ratepension stopper, livrente fortsætter)
 
-Livsforsikring sælges altid som **tillæg** til et af de tre opsparingsprodukter og opbygger ikke depot.
+### Fase 4 – Sektion 3: Investeringsrisiko
+- [ ] Slider: risikoniveau (lav/mellem/høj – mappes til σ og μ i GBM)
+- [ ] Monte Carlo simulation (1000 paths) af opsparing frem til pension
+- [ ] Vis percentiler (10%, 50%, 90%) som fan-chart
+- [ ] Sammenlign med risikofri rente fra Sektion 1
 
----
+### Fase 5 – Forfining
+- [ ] Mobilvenligt layout
+- [ ] Smooth scroll mellem sektioner
+- [ ] Tilføj forklaringsbokse til fagtermer (tooltip eller expandable)
+- [ ] Deploys til GitHub Pages
 
-## Notationstabel
+## Aktuarielle beregninger (src/utils/actuarial.js)
 
-| Symbol | Beskrivelse |
-|---|---|
-| `D_t` | Depotværdi ved starten af måned `t` |
-| `π` | Månedlig bruttopræmie (fast indbetalingsbeløb) |
-| `δ_liv,t` | Månedlig livsforsikringspræmie (fratrækkes inden investering) |
-| `α` | Månedlig depotomkostningsprocent (fx 0,10 % = 0,001) |
-| `r_t` | Realiseret månedligt investeringsafkast (stokastisk eller fast) |
-| `U_t` | Udbetaling i måneden (`= 0` i opsparingsperioden) |
-| `S` | Aftalt dækningssum (livsforsikringens forsikringssum) |
-| `μ_x` | Bedste skøn for dødelighedsintensitet ved alder `x` pr. år |
-| `μ_x⁺` | Konservativ dødelighedsintensitet: `μ_x⁺ = λ · μ_x` |
-| `λ` | Sikkerhedsfaktor, typisk 1,05–1,20 |
-| `x` | Forsikredes alder (opdateres løbende: `x = x₀ + t/12`) |
-| `μ` | Forventet log-afkast pr. år (GBM-parameter) |
-| `σ` | Volatilitet pr. år (GBM-parameter) |
-| `r_f` | Risikofri rente pr. år (bruges under risikoneutrale mål) |
-| `ε_t` | Standardnormalt stød, `ε_t ~ N(0,1)` |
+### Gompertz-Makeham mortalitet
+```js
+// Hazard rate: μ(x) = A + B * c^x
+// Typiske danske parametre (ca.):
+const A = 0.0007;
+const B = 0.00005;
+const c = 1.095;
 
----
+function hazard(x) { return A + B * Math.pow(c, x); }
 
-## Kerneformler
+// Overlevelsessandsynlighed fra alder x til x+t
+function survival(x, t, steps = 1000) {
+  const dt = t / steps;
+  let s = 1;
+  for (let i = 0; i < steps; i++) {
+    s *= (1 - hazard(x + i * dt) * dt);
+  }
+  return s;
+}
 
-### 1. Livsforsikringspræmie (månedlig)
+// Nutidsværdi af livrente fra pensionsalder x, med rente r
+function annuityPV(x, r, maxAge = 120) {
+  let pv = 0;
+  for (let t = 0; t <= maxAge - x; t++) {
+    pv += survival(x, t) * Math.pow(1 + r, -t);
+  }
+  return pv;
+}
 
-```
-δ_liv,t = S · μ_x⁺ · (1/12)
-```
-
-Dødelighedsintensiteten modelleres med **Gompertz-Makeham**:
-```
-μ_x = A + B · c^x
-```
-Standardparametre: `A = 0.0007`, `B = 0.00005`, `c = 1.095`
-
-Konservativ kalibrering: `μ_x⁺ = λ · μ_x`, typisk `λ ∈ [1.05, 1.20]`
-
-### 2. Månedlig depotfremregning (obligatorisk rækkefølge)
-
-```
-Trin 1 — Nettobidrag:
-  D_t* = D_t + π - δ_liv,t
-
-Trin 2 — Investeringsafkast (GBM, månedlig):
-  r_t = exp( (μ - σ²/2) · (1/12)  +  σ · √(1/12) · ε_t ) - 1
-  [deterministisk tilstand: sæt ε_t = 0]
-
-Trin 3 — Depotopdatering:
-  D_{t+1} = D_t* · (1 + r_t) · (1 - α) - U_t
-
-Trin 4 — PAL-skat (bogholderi — påvirker IKKE depotet):
-  PAL_t = (0.153 / 12) · max(D_t* · r_t, 0)
-  PAL_aconto += PAL_t
+// Månedlig ydelse fra opsparing S ved pensionsalder x
+function annuityPayment(S, x, r) {
+  return S / (annuityPV(x, r) * 12);
+}
 ```
 
----
-
-## Vigtige invarianter — må aldrig brydes
-
-1. **PAL fratrækkes IKKE depotet.** Den opgøres udelukkende som en acontoforpligtelse på selskabsniveau og nulstilles ved faktisk afregning til SKAT.
-2. **Livsforsikringspræmie fratrækkes i Trin 1** (inden investering), ikke i Trin 3.
-3. **Trinrækkefølgen 1 → 2 → 3 → 4 er obligatorisk** og må ikke ændres.
-4. **`D_t ≥ 0` til enhver tid** — depotet kan ikke blive negativt.
-5. **Alderen opdateres løbende:** `x = x₀ + t/12` — `δ_liv,t` stiger derfor med alderen.
-6. **Under livrente-konvertering** (ved pensionsalder) omdannes depot til livsvarig månedlig ydelse via aktuarmæssige konverteringsfaktorer (forventet restlevetid + renteniveau).
-7. **Negativ afkast-måned:** `PAL_t = 0` og akkumuleret underskud fremføres til reduktion af fremtidige PAL-betalinger.
-
----
-
-## Interaktive elementer (HTML-implementering)
-
-Følgende kontroller skal indgå i HTML-filen:
-
-| Parameter | Type | Standardværdi |
-|---|---|---|
-| Startdepot `D_0` | Talindtastning / slider | 500.000 kr. |
-| Månedlig præmie `π` | Talindtastning / slider | 3.000 kr. |
-| Nuværende alder `x₀` | Talindtastning | 40 år |
-| Pensionsalder | Talindtastning | 67 år |
-| Produkt | Radio-knapper | Ratepension |
-| Livsforsikring til/fra | Checkbox | Til |
-| Dækningssum `S` | Talindtastning | 500.000 kr. |
-| Sikkerhedsfaktor `λ` | Slider | 1,10 |
-| Forventet afkast `μ` | Slider | 6 % p.a. |
-| Volatilitet `σ` | Slider | 15 % p.a. |
-| Depotomkostning `α` | Slider | 0,10 % / md. |
-| Udbetalingsperiode (Rate) | Talindtastning | 15 år |
-| Monte Carlo-stier | Talindtastning | 200 |
-
-**Grafer:**
-- **Graf 1:** Deterministisk depotudvikling (ε_t = 0) fra nu til udbetalingsperiodens afslutning
-- **Graf 2:** Monte Carlo-bånd — percentiler P10, P50, P90 over `n` simulerede stier
-- **Nøgletal-panel:** Forventet depot ved pensionsalder, estimeret månedlig ydelse, akkumuleret PAL-forpligtelse
-
-Alle grafer og nøgletal opdateres **live** ved enhver parameterændring.
-
----
-
-## HTML-filstruktur
-
-```
-pension.html
-├── <head>
-│   ├── <script src="Chart.js CDN">
-│   └── <style> (inline CSS, responsivt layout)
-└── <body>
-    ├── <section id="controls">     ← alle sliders og inputs
-    ├── <canvas id="chart-depot">   ← deterministisk depotgraf
-    ├── <canvas id="chart-mc">      ← Monte Carlo-bånd
-    ├── <div id="summary">          ← nøgletal
-    └── <script>
-        ├── // Beregningsfunktioner
-        │   ├── beregnLivsforsikringsPraemie(S, mu_x_plus)
-        │   ├── beregnGBM(mu, sigma, epsilon)
-        │   ├── fremregn(params, stokastisk=false)   ← kerne-loop
-        │   └── beregnPAL(D_star, r_t)
-        ├── // Monte Carlo
-        │   └── monterCarlo(params, n=200)
-        ├── // Visualisering
-        │   ├── initCharts()
-        │   └── opdaterCharts(data)
-        └── // Event listeners
-            └── controls.addEventListener('input', opdater)
+### Ratepension
+```js
+function ratePayment(S, years, r) {
+  // Annuitet: S / Σ(1+r)^(-t) for t=1..years*12
+  const monthly_r = Math.pow(1 + r, 1/12) - 1;
+  const n = years * 12;
+  const pv_factor = (1 - Math.pow(1 + monthly_r, -n)) / monthly_r;
+  return S / pv_factor;
+}
 ```
 
----
+### Månedlig depotfremregning
 
-## Verificeringseksempel (bruges til at validere implementeringen)
+**VIGTIGT:** Ratepension og livrente har forskellig fremregning i udbetalingsperioden.
 
-Givet: `D₀ = 500.000 kr.`, `π = 3.000 kr.`, alder = 40, `S = 500.000 kr.`,
-`μ₄₀⁺ = 0,00180 pr. år`, `α = 0,10 % / md.`, `r₀ = 0,80 %` (fast, ε = 0).
+#### Ratepension og aldersopsparing (ingen dødelighedsgevinster)
+```js
+function stepDepot(D, pi, delta_liv, r_monthly, alpha, U) {
+  // Opsparingsperiode: π > 0, U = 0
+  // Udbetalingsperiode: π = 0, U = månedlig ydelse
+  return (D + pi - delta_liv) * (1 + r_monthly) * (1 - alpha) - U;
+}
+```
 
-| Trin | Beregning | Resultat |
-|---|---|---|
-| Livsforsikringspræmie | 500.000 × 0,00180 / 12 | 75 kr. |
-| Nettobidrag | 500.000 + 3.000 − 75 | 502.925 kr. |
-| Efter afkast (0,80 %) | 502.925 × 1,0080 | 506.948 kr. |
-| Depotomkostning (0,10 %) | 506.948 × (1 − 0,0010) | **506.441 kr.** |
-| PAL (bogholderi) | (0,153 / 12) × (502.925 × 0,008) | 51 kr. |
+#### Livrente i udbetalingsperioden (med dødelighedsgevinster)
+I Thieles differentialligning fremgår dødelighedsgevinsten af leddet `-μ(t)·D(t)`, der
+beskriver overdragelsen af depot fra afdøde til overlevende forsikringstagere. Set fra den
+overlevende forsikringstagers synsvinkel tilføjer dette `+μ_t·D_t` til depotet pr. måned:
 
-Implementeringen er korrekt, når `D₁ = 506.441 kr.` og `PAL₁ = 51 kr.` for disse inputværdier.
+```js
+function stepDepotLivrente(D, r_monthly, mu_annual, alpha, U) {
+  // mu_annual = hazard(x + t)  — den årlige dødelighedsintensitet for nuværende alder
+  // I opsparingsperioden bruges stepDepot() ovenfor (ingen dødelighedsgevinst).
+  const mu_monthly = mu_annual / 12;
+  return D * (1 + r_monthly + mu_monthly) * (1 - alpha) - U;
+}
+```
 
----
+**Uden dødelighedsgevinster (fejl):** `D * (1 + r_monthly) * (1 - alpha) - U`
+→ Depotet falder for hurtigt til nul, fordi ydelsen ikke modsvares af den tilstrømmende
+dødelighedsgevinst fra afdøde forsikringstagere.
 
-## Produktforskelle ved udbetalingsperioden
+**Med dødelighedsgevinster (korrekt):** `D * (1 + r_monthly + mu_monthly) * (1 - alpha) - U`
+→ Ved høj alder (stor μ) kan dødelighedsgevinsten overstige ydelsen, så depotet
+stabiliseres eller vokser — det aktuarmæssige fundament for livrenten.
 
-| | Ratepension | Livrente | Aldersopsparing |
-|---|---|---|---|
-| Udbetalingsform | Fast månedlig rate i aftalt periode (min. 10 år) | Livsvarig ydelse (konverteres ved pensionsalder) | Rate eller engangsudbetaling |
-| `U_t` beregning | `Depot / resterende_måneder` | Fastsat ved konvertering via aktuarfaktor | Aftalt plan |
-| Overlevelsesgevinster | Nej | Ja — indgår i konverteringsfaktoren | Nej |
-| Skattefri udbetaling | Nej | Nej | **Ja** |
-| Depot ved død | Udbetales til begunstigede | Ophører (medmindre ægtefælledækning) | Udbetales til begunstigede |
+## Design-principper
+
+- **Simpelt og rent** – ingen unødige elementer
+- **Dansk** – al tekst på dansk, brug komma som decimalseparator i visning
+- **Pædagogisk** – vis formler, men forklar dem i plain dansk
+- **Interaktivt** – grafer opdateres live ved input-ændringer
+- **Ikke-sælgende** – ingen produktanbefalinger, kun konsekvenser
+
+## Farvepalette (forslag)
+- Primær: `#1e3a5f` (mørk blå)
+- Accent: `#e8a020` (varm orange)
+- Baggrund: `#f8f9fa`
+- Tekst: `#212529`
+- Graf-farver: blå, orange, grøn for hhv. alderspension, ratepension, livrente
+
+## Vigtige noter
+
+- Alle beregninger er **illustrative** – ikke finansiel rådgivning
+- Tilføj disclaimer øverst på siden
+- Brug dansk skat kun hvis det tilføjer pædagogisk værdi (det komplicerer beregningerne)
+- Start **altid** med Fase 1 færdig før du går til Fase 2
+- **Fremregning:** Brug `stepDepotLivrente()` (ikke `stepDepot()`) for livrente i
+  udbetalingsperioden — ellers falder depotet for hurtigt til nul pga. manglende
+  dødelighedsgevinster
