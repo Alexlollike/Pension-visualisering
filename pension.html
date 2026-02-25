@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pensionsprognose</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      background: #f1f5f9;
+      color: #1e293b;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      background: #1e3a5f;
+      color: #fff;
+      padding: 0 1.25rem;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.02em; }
+    #produkt-badge {
+      margin-left: auto;
+      background: rgba(255,255,255,0.15);
+      border-radius: 20px;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    /* ── Main layout ─────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      height: calc(100vh - 52px);
+    }
+
+    /* ── Sidepanel ──────────────────────────────────────────── */
+    #kontroller {
+      background: #fff;
+      border-right: 1px solid #e2e8f0;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+    #kontroller::-webkit-scrollbar { width: 5px; }
+    #kontroller::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    .gruppe {
+      margin-bottom: 1.1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .gruppe:last-child { border-bottom: none; margin-bottom: 0; }
+    .gruppe-titel {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 0.65rem;
+    }
+
+    .felt { margin-bottom: 0.6rem; }
+    .felt label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 0.3rem;
+    }
+    .felt input[type="number"] {
+      width: 100%;
+      padding: 0.35rem 0.5rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      font-size: 0.85rem;
+      color: #1e293b;
+      background: #f8fafc;
+      transition: border-color 0.15s;
+    }
+    .felt input[type="number"]:focus {
+      outline: none;
+      border-color: #2563eb;
+      background: #fff;
+    }
+
+    /* Sliders */
+    .slider-roed {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .slider-roed input[type="range"] {
+      flex: 1;
+      height: 4px;
+      accent-color: #2563eb;
+      cursor: pointer;
+    }
+    .slider-vaerdi {
+      min-width: 3.5rem;
+      text-align: right;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #1e3a5f;
+    }
+
+    /* Radio-knapper */
+    .radio-gruppe { display: flex; flex-direction: column; gap: 0.35rem; }
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: #334155;
+      padding: 0.3rem 0.4rem;
+      border-radius: 5px;
+      border: 1px solid transparent;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .radio-label:has(input:checked) {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+      font-weight: 600;
+    }
+    .radio-label input { accent-color: #2563eb; }
+
+    /* Checkbox */
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: #334155;
+    }
+    .checkbox-label input { accent-color: #2563eb; width: 15px; height: 15px; }
+
+    #livsforsikring-detaljer { margin-top: 0.5rem; }
+    #udbetalingsperiode-gruppe { }
+
+    /* ── Indholdsområde ─────────────────────────────────────── */
+    #indhold {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      overflow: hidden;
+    }
+
+    #grafbeholder {
+      flex: 1;
+      min-height: 0;
+      background: #fff;
+      border-radius: 8px;
+      padding: 1rem 1rem 0.75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      position: relative;
+    }
+    #grafbeholder canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* ── Nøgletal-kort ──────────────────────────────────────── */
+    #nogletal {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+    .kort {
+      background: #fff;
+      border-radius: 8px;
+      padding: 0.85rem 1.1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      border-left: 3px solid transparent;
+    }
+    .kort.blaa { border-left-color: #2563eb; }
+    .kort.groen { border-left-color: #16a34a; }
+    .kort.roed  { border-left-color: #dc2626; }
+
+    .kort-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 0.3rem;
+    }
+    .kort-vaerdi {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #1e3a5f;
+      line-height: 1.2;
+    }
+    .kort-undertext {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-top: 0.2rem;
+    }
+
+    /* Fejlbesked */
+    #fejl-besked {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      color: #b91c1c;
+      border-radius: 6px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.82rem;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── Responsivt ─────────────────────────────────────────── */
+    @media (max-width: 820px) {
+      body { overflow: auto; }
+      .layout { grid-template-columns: 1fr; height: auto; }
+      #kontroller { height: auto; overflow-y: visible; }
+      #indhold { height: 80vh; }
+      #nogletal { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Pensionsprognose</h1>
+  <span id="produkt-badge">Ratepension</span>
+</header>
+
+<main class="layout">
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SIDEPANEL MED KONTROLLER
+  ════════════════════════════════════════════════════════════════ -->
+  <aside id="kontroller">
+
+    <!-- Personlige oplysninger -->
+    <div class="gruppe">
+      <div class="gruppe-titel">Person</div>
+      <div class="felt">
+        <label for="alder">Nuværende alder (år)</label>
+        <input type="number" id="alder" value="40" min="18" max="100" step="1">
+      </div>
+      <div class="felt">
+        <label for="pensionsAlder">Pensionsalder (år)</label>
+        <input type="number" id="pensionsAlder" value="67" min="50" max="85" step="1">
+      </div>
+    </div>
+
+    <!-- Indbetaling -->
+    <div class="gruppe">
+      <div class="gruppe-titel">Indbetaling</div>
+      <div class="felt">
+        <label for="startdepot">Startdepot (kr.)</label>
+        <input type="number" id="startdepot" value="500000" min="0" step="10000">
+      </div>
+      <div class="felt">
+        <label for="praemie">Månedlig præmie (kr.)</label>
+        <input type="number" id="praemie" value="3000" min="0" step="500">
+      </div>
+    </div>
+
+    <!-- Produkt -->
+    <div class="gruppe">
+      <div class="gruppe-titel">Pensionsprodukt</div>
+      <div class="felt">
+        <div class="radio-gruppe">
+          <label class="radio-label">
+            <input type="radio" name="produkt" value="ratepension" checked>
+            Ratepension
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="produkt" value="livrente">
+            Livrente
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="produkt" value="aldersopsparing">
+            Aldersopsparing
+          </label>
+        </div>
+      </div>
+      <div class="felt" id="udbetalingsperiode-gruppe">
+        <label for="udbetalingsperiode">Udbetalingsperiode (år)</label>
+        <input type="number" id="udbetalingsperiode" value="15" min="10" max="30" step="1">
+      </div>
+    </div>
+
+    <!-- Livsforsikring -->
+    <div class="gruppe">
+      <div class="gruppe-titel">Livsforsikring</div>
+      <div class="felt">
+        <label class="checkbox-label">
+          <input type="checkbox" id="livsforsikring" checked>
+          Tilføj livsforsikring
+        </label>
+      </div>
+      <div id="livsforsikring-detaljer">
+        <div class="felt">
+          <label for="daekningssum">Dækningssum (kr.)</label>
+          <input type="number" id="daekningssum" value="500000" min="0" step="50000">
+        </div>
+        <div class="felt">
+          <label for="lambda">Sikkerhedsfaktor λ</label>
+          <div class="slider-roed">
+            <input type="range" id="lambda" min="1.00" max="1.50" step="0.01" value="1.10">
+            <span class="slider-vaerdi" id="lambda-vaerdi">1,10</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Investeringsparametre -->
+    <div class="gruppe">
+      <div class="gruppe-titel">Investering</div>
+      <div class="felt">
+        <label for="mu">Forventet afkast μ (p.a.)</label>
+        <div class="slider-roed">
+          <input type="range" id="mu" min="0" max="0.15" step="0.001" value="0.06">
+          <span class="slider-vaerdi" id="mu-vaerdi">6,0 %</span>
+        </div>
+      </div>
+      <div class="felt">
+        <label for="sigma">Volatilitet σ (p.a.)</label>
+        <div class="slider-roed">
+          <input type="range" id="sigma" min="0" max="0.30" step="0.005" value="0.15">
+          <span class="slider-vaerdi" id="sigma-vaerdi">15,0 %</span>
+        </div>
+      </div>
+      <div class="felt">
+        <label for="alpha">Depotomkostning α (pr. md.)</label>
+        <div class="slider-roed">
+          <input type="range" id="alpha" min="0" max="0.005" step="0.0001" value="0.001">
+          <span class="slider-vaerdi" id="alpha-vaerdi">0,10 %</span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       GRAFOMRÅDE OG NØGLETAL
+  ════════════════════════════════════════════════════════════════ -->
+  <section id="indhold">
+    <div id="fejl-besked" role="alert"></div>
+    <div id="grafbeholder">
+      <canvas id="depotGraf"></canvas>
+    </div>
+    <div id="nogletal">
+      <div class="kort blaa">
+        <div class="kort-label">Depot ved pensionsalder</div>
+        <div class="kort-vaerdi" id="nogletal-depot">—</div>
+        <div class="kort-undertext" id="nogletal-depot-sub">Ved alder 67 år</div>
+      </div>
+      <div class="kort groen">
+        <div class="kort-label">Estimeret månedlig ydelse</div>
+        <div class="kort-vaerdi" id="nogletal-ydelse">—</div>
+        <div class="kort-undertext" id="nogletal-ydelse-sub">Brutto, før skat</div>
+      </div>
+      <div class="kort roed">
+        <div class="kort-label">Akkumuleret PAL-forpligtelse</div>
+        <div class="kort-vaerdi" id="nogletal-pal">—</div>
+        <div class="kort-undertext">Acontoforpligtelse (bogholderi)</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // ════════════════════════════════════════════════════════════════════
+  // BEREGNINGSFUNKTIONER
+  // ════════════════════════════════════════════════════════════════════
+
+  // Gompertz-Makeham dødelighedsintensitet, μ_x pr. år
+  function gompertzMakeham(x) {
+    const A = 0.0007, B = 0.00005, c = 1.095;
+    return A + B * Math.pow(c, x);
+  }
+
+  // Månedlig livsforsikringspræmie: δ_liv,t = S · λ · μ_x / 12
+  function livsforsikringsPraemie(S, x, lambda) {
+    return S * lambda * gompertzMakeham(x) / 12;
+  }
+
+  // Deterministisk månedligt afkast (GBM, ε=0):
+  // r_t = exp((μ - σ²/2) / 12) - 1
+  function deterministiskAfkast(mu, sigma) {
+    return Math.exp((mu - 0.5 * sigma * sigma) / 12) - 1;
+  }
+
+  // Livrente-annuitetsfaktor ä_x ved pensionsalder:
+  // ä = Σ_{k=0}^{(110-x)*12} kp_x · v^k
+  // Bruger fast diskontorente 2 % p.a. (intern aktuarmæssig antagelse).
+  // Overlevelsessandsynlighed: kp_x opdateres med exp(-μ_x · λ / 12) pr. måned.
+  function livrenteAnnuitetsFaktor(x_pension, lambda) {
+    const r_mdr = Math.pow(1.02, 1 / 12) - 1;
+    const maxMdr = Math.floor((110 - x_pension) * 12);
+    let faktor = 0;
+    let log_overlevelse = 0;
+    for (let k = 0; k < maxMdr; k++) {
+      faktor += Math.exp(log_overlevelse) * Math.pow(1 / (1 + r_mdr), k);
+      const x_k = x_pension + k / 12;
+      log_overlevelse -= gompertzMakeham(x_k) * lambda / 12;
+    }
+    return faktor; // månedlig ydelse = depotVedPension / faktor
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Kerne-loop: fremregner depotet måned for måned.
+  //
+  // NOTA BENE: Verificeringseksemplet i CLAUDE.md bruger r₀=0,80 % og
+  // δ_liv=75 kr. som FASTE inputværdier til illustration af trinrækkefølgen
+  // — ikke som output af formlerne. Begge er korrekte; eksemplet tester
+  // algebraen, ikke parameterkalibreringen.
+  //
+  // Invarianter (må aldrig brydes):
+  //   1. PAL fratrækkes IKKE depotet — kun acontoforpligtelse.
+  //   2. Livsforsikringspræmie fratrækkes i Trin 1 (inden investering).
+  //   3. Trinrækkefølge 1→2→3→4 er obligatorisk.
+  //   4. D_t ≥ 0 til enhver tid.
+  //   5. Alder opdateres løbende: x = x₀ + t/12.
+  // ──────────────────────────────────────────────────────────────────
+  function fremregn(params) {
+    const {
+      D0,                  // Startdepot (kr.)
+      pi,                  // Månedlig bruttopræmie (kr.)
+      x0,                  // Nuværende alder (år)
+      pensionsAlder,       // Pensionsalder (år)
+      produkt,             // 'ratepension' | 'livrente' | 'aldersopsparing'
+      harLivsforsikring,   // boolean
+      S,                   // Dækningssum (kr.)
+      lambda,              // Sikkerhedsfaktor
+      mu,                  // Forventet log-afkast pr. år
+      sigma,               // Volatilitet pr. år
+      alpha,               // Månedlig depotomkostningsprocent
+      udbetalingsperiode,  // År (Ratepension/Aldersopsparing)
+    } = params;
+
+    const akkMdr = Math.round((pensionsAlder - x0) * 12);
+
+    let udMdr;
+    if (produkt === 'livrente') {
+      udMdr = Math.floor((110 - pensionsAlder) * 12);
+    } else {
+      udMdr = Math.round(udbetalingsperiode * 12);
+    }
+
+    const totalMdr = akkMdr + udMdr;
+
+    // Forudberegnede arrays
+    const aldere      = new Float64Array(totalMdr + 1);
+    const depoter     = new Float64Array(totalMdr + 1);
+    const palAconto   = new Float64Array(totalMdr + 1);
+
+    // Deterministisk månedligt afkast (konstant for hele perioden, ε=0)
+    const r = deterministiskAfkast(mu, sigma);
+
+    let D = Math.max(0, D0);
+    let palLobende = 0;
+    let maanedligYdelse = 0;
+    let depotVedPension = 0;
+
+    for (let t = 0; t <= totalMdr; t++) {
+      const x = x0 + t / 12;
+      aldere[t]    = x;
+      depoter[t]   = D;
+      palAconto[t] = palLobende;
+
+      if (t === totalMdr) break;
+
+      const erUdbetaling = (t >= akkMdr);
+
+      // Ved pensionsalder: beregn månedlig ydelse én gang
+      if (t === akkMdr) {
+        depotVedPension = D;
+        if (produkt === 'livrente') {
+          const ae = livrenteAnnuitetsFaktor(pensionsAlder, lambda);
+          maanedligYdelse = ae > 0 ? D / ae : 0;
+        } else {
+          // Ratepension og Aldersopsparing: simpel fordeling
+          maanedligYdelse = udMdr > 0 ? D / udMdr : 0;
+        }
+      }
+
+      // Trin 1 — Nettobidrag
+      // δ_liv fratrækkes kun i opsparingsperioden
+      let deltaLiv = 0;
+      if (harLivsforsikring && !erUdbetaling) {
+        deltaLiv = livsforsikringsPraemie(S, x, lambda);
+      }
+      const praemieIndskud = erUdbetaling ? 0 : pi;
+      const D_star = D + praemieIndskud - deltaLiv;
+
+      // Trin 2 — Investeringsafkast (deterministisk, ε=0)
+      const r_t = r;
+
+      // Trin 3 — Depotopdatering
+      const U_t = erUdbetaling ? maanedligYdelse : 0;
+      const D_naeste = D_star * (1 + r_t) * (1 - alpha) - U_t;
+      D = Math.max(0, D_naeste);
+
+      // Trin 4 — PAL-skat (bogholderi — påvirker IKKE depotet)
+      // PAL_t = (0.153/12) · max(D_t* · r_t, 0)
+      const pal_t = (0.153 / 12) * Math.max(D_star * r_t, 0);
+      palLobende += pal_t;
+    }
+
+    return {
+      aldere,
+      depoter,
+      palAconto,
+      maanedligYdelse,
+      depotVedPension,
+      palTotal: palLobende,
+      akkMdr,
+    };
+  }
+
+
+  // ════════════════════════════════════════════════════════════════════
+  // FORMATERING
+  // ════════════════════════════════════════════════════════════════════
+
+  function formatKr(v) {
+    if (!isFinite(v) || isNaN(v)) return '—';
+    if (Math.abs(v) >= 1e6) {
+      return (v / 1e6).toLocaleString('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' mio. kr.';
+    }
+    return Math.round(v).toLocaleString('da-DK') + ' kr.';
+  }
+
+  function formatKrMd(v) {
+    if (!isFinite(v) || isNaN(v)) return '—';
+    return Math.round(v).toLocaleString('da-DK') + ' kr./md.';
+  }
+
+
+  // ════════════════════════════════════════════════════════════════════
+  // CHART.JS — custom plugin til pensionsalder-linje
+  // ════════════════════════════════════════════════════════════════════
+
+  const pensionsLinjePlugin = {
+    id: 'pensionsLinje',
+    afterDraw(chart) {
+      const opts = chart.options._pensionsAlder;
+      if (opts == null) return;
+      const lbls = chart.data.labels;
+      const idx  = lbls.indexOf(String(Math.round(opts)));
+      if (idx === -1) return;
+      const xPx = chart.scales.x.getPixelForValue(idx);
+      const ctx  = chart.ctx;
+      ctx.save();
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth   = 1.5;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(xPx, chart.scales.y.top);
+      ctx.lineTo(xPx, chart.scales.y.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#dc2626';
+      ctx.font      = '11px system-ui';
+      ctx.fillText('Pension', xPx + 4, chart.scales.y.top + 13);
+      ctx.restore();
+    },
+  };
+  Chart.register(pensionsLinjePlugin);
+
+
+  // ════════════════════════════════════════════════════════════════════
+  // CHART INITIALISERING
+  // ════════════════════════════════════════════════════════════════════
+
+  let depotChart;
+
+  function initChart() {
+    const ctx = document.getElementById('depotGraf').getContext('2d');
+    depotChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Opsparingsperiode',
+            data: [],
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.07)',
+            fill: true,
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0.25,
+            spanGaps: false,
+          },
+          {
+            label: 'Udbetalingsperiode',
+            data: [],
+            borderColor: '#d97706',
+            backgroundColor: 'rgba(217, 119, 6, 0.07)',
+            fill: true,
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0.25,
+            spanGaps: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            align: 'end',
+            labels: { boxWidth: 12, font: { size: 11 } },
+          },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const v = ctx.parsed.y;
+                if (v == null) return null;
+                return ctx.dataset.label + ': ' + formatKr(v);
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Alder (år)', font: { size: 11 } },
+            ticks: { font: { size: 10 }, maxTicksLimit: 20 },
+            grid: { color: 'rgba(0,0,0,0.04)' },
+          },
+          y: {
+            title: { display: true, text: 'Depot (kr.)', font: { size: 11 } },
+            ticks: {
+              font: { size: 10 },
+              maxTicksLimit: 8,
+              callback: (v) => {
+                if (v >= 1e6) return (v / 1e6).toFixed(1) + ' mio.';
+                if (v >= 1e3) return (v / 1e3).toFixed(0) + ' t.';
+                return v;
+              },
+            },
+            grid: { color: 'rgba(0,0,0,0.04)' },
+          },
+        },
+        _pensionsAlder: null,
+      },
+    });
+  }
+
+
+  // ════════════════════════════════════════════════════════════════════
+  // CHART OPDATERING
+  // ════════════════════════════════════════════════════════════════════
+
+  function opdaterChart(resultat, pensionsAlder) {
+    const { aldere, depoter, akkMdr } = resultat;
+    const n = aldere.length;
+
+    // Subsample: brug et datapunkt pr. kvartal (hvert 3. måned) for at
+    // holde grafen flydende uden at overbelaste Canvas.
+    const trin = 3;
+    const labels   = [];
+    const ds0      = []; // Opsparingsperiode
+    const ds1      = []; // Udbetalingsperiode
+
+    // Index i det subsamplede array, der svarer til pensionsalderen
+    let pensionsIdx = -1;
+
+    for (let t = 0; t < n; t += trin) {
+      const alder = aldere[t];
+      const depot = depoter[t];
+      labels.push(alder.toFixed(1));
+
+      const erPension = (t >= akkMdr);
+      const erTransition = (t >= akkMdr - trin && t <= akkMdr);
+
+      if (!erPension) {
+        ds0.push(depot);
+        ds1.push(null);
+      } else {
+        if (pensionsIdx === -1) {
+          pensionsIdx = labels.length - 1;
+          // Overlap: opsparings-dataset ender ved pensionsalderens punkt
+          ds0.push(depot);
+        } else {
+          ds0.push(null);
+        }
+        ds1.push(depot);
+      }
+    }
+
+    depotChart.data.labels                    = labels;
+    depotChart.data.datasets[0].data          = ds0;
+    depotChart.data.datasets[1].data          = ds1;
+    depotChart.options._pensionsAlder         = pensionsAlder;
+
+    depotChart.update('none');
+  }
+
+
+  // ════════════════════════════════════════════════════════════════════
+  // NØGLETAL
+  // ════════════════════════════════════════════════════════════════════
+
+  function opdaterNogletal(resultat, params) {
+    const { depotVedPension, maanedligYdelse, palTotal } = resultat;
+    const { pensionsAlder, produkt } = params;
+
+    document.getElementById('nogletal-depot').textContent     = formatKr(depotVedPension);
+    document.getElementById('nogletal-depot-sub').textContent = `Ved alder ${Math.round(pensionsAlder)} år`;
+
+    document.getElementById('nogletal-ydelse').textContent    = formatKrMd(maanedligYdelse);
+
+    const ydelseSub = produkt === 'livrente'
+      ? 'Livsvarig ydelse, brutto'
+      : produkt === 'aldersopsparing'
+        ? 'Skattefri udbetaling'
+        : 'Brutto, før skat';
+    document.getElementById('nogletal-ydelse-sub').textContent = ydelseSub;
+
+    document.getElementById('nogletal-pal').textContent = formatKr(palTotal);
+  }
+
+
+  // ════════════════════════════════════════════════════════════════════
+  // LÆS PARAMETRE FRA FORMULAR
+  // ════════════════════════════════════════════════════════════════════
+
+  function laesParametre() {
+    const alder            = parseFloat(document.getElementById('alder').value)           || 40;
+    const pensionsAlder    = parseFloat(document.getElementById('pensionsAlder').value)   || 67;
+    const D0               = parseFloat(document.getElementById('startdepot').value)      || 0;
+    const pi               = parseFloat(document.getElementById('praemie').value)         || 0;
+    const produkt          = document.querySelector('input[name="produkt"]:checked')?.value || 'ratepension';
+    const udbetalingsperiode = parseFloat(document.getElementById('udbetalingsperiode').value) || 15;
+    const harLivsforsikring  = document.getElementById('livsforsikring').checked;
+    const S                  = parseFloat(document.getElementById('daekningssum').value)  || 0;
+    const lambda             = parseFloat(document.getElementById('lambda').value)        || 1.10;
+    const mu                 = parseFloat(document.getElementById('mu').value)            || 0;
+    const sigma              = parseFloat(document.getElementById('sigma').value)         || 0;
+    const alpha              = parseFloat(document.getElementById('alpha').value)         || 0;
+
+    return {
+      alder, pensionsAlder, D0, pi, produkt, udbetalingsperiode,
+      harLivsforsikring, S, lambda, mu, sigma, alpha,
+      x0: alder,
+    };
+  }
+
+
+  // ════════════════════════════════════════════════════════════════════
+  // HOVED-OPDATERINGSFUNKTION
+  // ════════════════════════════════════════════════════════════════════
+
+  function opdater() {
+    const params = laesParametre();
+    const fejlEl = document.getElementById('fejl-besked');
+
+    // Validering
+    if (params.pensionsAlder <= params.alder) {
+      fejlEl.style.display = 'block';
+      fejlEl.textContent   = 'Pensionsalderen skal være større end den nuværende alder.';
+      return;
+    }
+    if (params.udbetalingsperiode < 1 && params.produkt !== 'livrente') {
+      fejlEl.style.display = 'block';
+      fejlEl.textContent   = 'Udbetalingsperioden skal være mindst 1 år.';
+      return;
+    }
+    fejlEl.style.display = 'none';
+
+    // Fremregning
+    const resultat = fremregn(params);
+
+    // Opdater graf og nøgletal
+    opdaterChart(resultat, params.pensionsAlder);
+    opdaterNogletal(resultat, params);
+
+    // Opdater produkt-badge i header
+    const navne = { ratepension: 'Ratepension', livrente: 'Livrente', aldersopsparing: 'Aldersopsparing' };
+    document.getElementById('produkt-badge').textContent = navne[params.produkt] || '';
+  }
+
+
+  // ════════════════════════════════════════════════════════════════════
+  // EVENT LISTENERS
+  // ════════════════════════════════════════════════════════════════════
+
+  // Slider-synkronisering
+  const sliderKonfig = [
+    {
+      id: 'lambda',
+      format: (v) => parseFloat(v).toFixed(2).replace('.', ','),
+    },
+    {
+      id: 'mu',
+      format: (v) => (parseFloat(v) * 100).toFixed(1).replace('.', ',') + ' %',
+    },
+    {
+      id: 'sigma',
+      format: (v) => (parseFloat(v) * 100).toFixed(1).replace('.', ',') + ' %',
+    },
+    {
+      id: 'alpha',
+      format: (v) => (parseFloat(v) * 100).toFixed(2).replace('.', ',') + ' %',
+    },
+  ];
+
+  sliderKonfig.forEach(({ id, format }) => {
+    const slider = document.getElementById(id);
+    const vaerdi = document.getElementById(id + '-vaerdi');
+    slider.addEventListener('input', () => {
+      vaerdi.textContent = format(slider.value);
+      opdater();
+    });
+  });
+
+  // Livsforsikring-checkbox: toggle synlighed
+  document.getElementById('livsforsikring').addEventListener('change', function () {
+    document.getElementById('livsforsikring-detaljer').style.display =
+      this.checked ? 'block' : 'none';
+    opdater();
+  });
+
+  // Produkt-radio: toggle udbetalingsperiode-felt
+  document.querySelectorAll('input[name="produkt"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      const skjulUdbetaling = document.querySelector('input[name="produkt"]:checked').value === 'livrente';
+      document.getElementById('udbetalingsperiode-gruppe').style.display =
+        skjulUdbetaling ? 'none' : 'block';
+      opdater();
+    });
+  });
+
+  // Alle øvrige inputs i kontrolpanelet
+  document.getElementById('kontroller').addEventListener('input', (e) => {
+    // Sliders håndteres separat ovenfor; her fanges number-inputs og checkboxes
+    const tag  = e.target.tagName.toLowerCase();
+    const type = e.target.type;
+    if (tag === 'input' && type !== 'range') {
+      opdater();
+    }
+  });
+
+
+  // ════════════════════════════════════════════════════════════════════
+  // INITIALISERING
+  // ════════════════════════════════════════════════════════════════════
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initChart();
+    opdater();
+  });
+
+</script>
+</body>
+</html>
