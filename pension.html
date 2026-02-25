@@ -483,16 +483,14 @@
 
       const erUdbetaling = (t >= akkMdr);
 
-      // Ved pensionsalder: beregn månedlig ydelse én gang
+      // Ved pensionsalder: gem depot; fast ydelse kun for ratepension/aldersopsparing
       if (t === akkMdr) {
         depotVedPension = D;
-        if (produkt === 'livrente') {
-          const ae = livrenteAnnuitetsFaktor(pensionsAlder, lambda);
-          maanedligYdelse = ae > 0 ? D / ae : 0;
-        } else {
-          // Ratepension og Aldersopsparing: simpel fordeling
+        if (produkt !== 'livrente') {
+          // Ratepension og Aldersopsparing: fast ydelse fordelt jævnt over perioden
           maanedligYdelse = udMdr > 0 ? D / udMdr : 0;
         }
+        // Livrente: ydelsen genberegnes dynamisk hver måned (se Trin 3 nedenfor)
       }
 
       // Trin 1 — Nettobidrag
@@ -508,8 +506,26 @@
       const r_t = r;
 
       // Trin 3 — Depotopdatering
-      const U_t = erUdbetaling ? maanedligYdelse : 0;
-      const D_naeste = D_star * (1 + r_t) * (1 - alpha) - U_t;
+      // Livrente i udbetalingsperioden bruger Thieles differentialligning:
+      //   Dødelighedsgevinst: vækstfaktor (1 + r_t + μ_t) frem for (1 + r_t)
+      //   Dynamisk ydelse:    U_t = D / ä_x  ("1-krones passiv" for aktuel alder x)
+      // Ratepension/Aldersopsparing: fast ydelse, ingen dødelighedsgevinst.
+      let U_t = 0;
+      let D_naeste;
+      if (erUdbetaling) {
+        if (produkt === 'livrente') {
+          const mu_monthly = gompertzMakeham(x) / 12;
+          const ae = livrenteAnnuitetsFaktor(x, lambda);
+          U_t = ae > 0 ? D_star / ae : 0;
+          if (t === akkMdr) maanedligYdelse = U_t; // gem startydelse til nøgletal
+          D_naeste = D_star * (1 + r_t + mu_monthly) * (1 - alpha) - U_t;
+        } else {
+          U_t = maanedligYdelse;
+          D_naeste = D_star * (1 + r_t) * (1 - alpha) - U_t;
+        }
+      } else {
+        D_naeste = D_star * (1 + r_t) * (1 - alpha);
+      }
       D = Math.max(0, D_naeste);
 
       // Trin 4 — PAL-skat (bogholderi — påvirker IKKE depotet)
