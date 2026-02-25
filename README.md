@@ -117,26 +117,37 @@ Alle tre opsparingsprodukter (ratepension, livrente og aldersopsparing) er **uni
 
 ### Notation
 
-|Symbol          |Beskrivelse                                           |
-|----------------|------------------------------------------------------|
-|$D_t$           |Depotværdi ved starten af måned $t$                   |
-|$\pi$           |Månedlig bruttopræmie                                 |
-|$\delta_{liv,t}$|Månedlig livsforsikringspræmie (se ovenfor)           |
-|$\alpha$        |Månedlig depotomkostningsprocent (f.eks. 0,10 % / md.)|
-|$r_t$           |Realiseret månedligt investeringsafkast               |
-|$U_t$           |Udbetaling i måneden (0 i opsparingsperioden)         |
+|Symbol          |Beskrivelse                                                              |
+|----------------|-------------------------------------------------------------------------|
+|$D_t$           |Depotværdi ved starten af måned $t$                                      |
+|$\pi$           |Månedlig bruttopræmie                                                    |
+|$\delta_{liv,t}$|Månedlig livsforsikringspræmie (se ovenfor)                              |
+|$\alpha$        |Månedlig depotomkostningsprocent (f.eks. 0,10 % / md.)                  |
+|$r_t$           |Realiseret månedligt investeringsafkast                                  |
+|$\mu_t$         |Månedlig dødelighedsintensitet: $\mu(x+t)/12$ (kun livrente, se nedenfor)|
+|$U_t$           |Udbetaling i måneden (0 i opsparingsperioden)                            |
 
 ### Fremregningsformel
 
+**Ratepension og aldersopsparing** udbetaler depotet til begunstigede ved dødsfald. Dødsfaldssummen svarer dermed til depotets størrelse, og nettorisikoen ved dødsfald er nul — der er ingen dødelighedsgevinster:
+
 $$D_{t+1} = \Bigl(D_t + \pi - \delta_{liv,t}\Bigr) \cdot (1 + r_t) \cdot (1 - \alpha) - U_t$$
+
+**Livrente** er i udbetalingsperioden som regel uden tilbagebetalingsgaranti: ved dødsfald ophører udbetalingerne og depotet arves ikke. Det frigiver de afdødes depoter til fordel for de overlevende forsikringstagere — de såkaldte **dødelighedsgevinster**.
+
+I Thieles differentialligning fremgår dødelighedsgevinsten af leddet $-\mu(t)\cdot D(t)$, der udtrykker den øjeblikkelige overdragelse af depot fra afdøde til de overlevende. Omregnet til et månedsskridt og set fra den *overlevende* forsikringstagers synsvinkel tilføjer dette et positivt bidrag $+\mu_t \cdot D_t$ til depotet:
+
+$$D_{t+1} = \Bigl(D_t + \pi - \delta_{liv,t}\Bigr) \cdot (1 + r_t + \mu_t) \cdot (1 - \alpha) - U_t$$
+
+I opsparingsperioden gælder ratepensionsformlen for alle produkter, fordi depotet udbetales ved dødsfald og nettoresikoen er nul.
 
 PAL-skatten fratrækkes **ikke** depotet i fremregningen. Den opgøres separat som en løbende acontoforpligtelse (se nedenfor).
 
-**Trin for trin:**
+**Trin for trin (livrente i udbetalingsperioden):**
 
-**1. Nettobidrag til depot:**
-$$D_t^* = D_t + \pi - \delta_{liv,t}$$
-Bruttopræmien tilgår depotet, mens livsforsikringspræmien fratrækkes som risikopræmie inden investering.
+**1. Nettobidrag og dødelighedsgevinst:**
+$$D_t^* = D_t \cdot (1 + \mu_t)$$
+De overlevende forsikringstageres depoter forhøjes med andelen af det depot, der frigives fra afdøde ($\mu_t = \mu(x+t)/12$). I opsparingsperioden, eller for ratepension og aldersopsparing, erstattes dette trin med det sædvanlige nettobidrag $D_t^* = D_t + \pi - \delta_{liv,t}$.
 
 **2. Investeringsafkast (Black-Scholes, månedlig):**
 $$r_t = \exp!\left(\left(\mu - \tfrac{1}{2}\sigma^2\right)\tfrac{1}{12} + \sigma\sqrt{\tfrac{1}{12}},\varepsilon_t\right) - 1, \quad \varepsilon_t \sim \mathcal{N}(0,1)$$
@@ -154,29 +165,45 @@ Forpligtelsen nulstilles ved den faktiske afregning til SKAT. Ved negativt afkas
 **5. Udbetaling:**
 I opsparingsperioden er $U_t = 0$. I udbetalingsperioden udbetales den aftalte ydelse — for ratepension en fast månedlig rate, for livrente en livsvarig ydelse fastsat ved konverteringstidspunktet.
 
-### Eksempel (enkelt police, 1 måned)
+### Eksempel A — opsparingsperiode (alle produkter, 1 måned)
 
-Antag: $D_0 = 500.000$ kr., $\pi = 3.000$ kr., alder 40 år, dækningssum 500.000 kr., $\mu_{40}^+ = 0{,}00180$ pr. år, $\alpha = 0{,}10,%$, $r_0 = 0{,}80,%$.
+Antag: $D_0 = 500.000$ kr., $\pi = 3.000$ kr., alder 40 år, dækningssum 500.000 kr., $\mu_{40}^+ = 0{,}00180$ pr. år, $\alpha = 0{,}10\,\%$, $r_0 = 0{,}80\,\%$.
 
-|Trin                                  |Beregning                        |Resultat       |
-|--------------------------------------|---------------------------------|---------------|
-|Livsforsikringspræmie                 |500.000 × 0,00180 / 12           |75 kr.         |
-|Nettobidrag                           |500.000 + 3.000 − 75             |502.925 kr.    |
-|Efter afkast (0,80 %)                 |502.925 × 1,0080                 |506.948 kr.    |
-|Depotomkostning (0,10 %)              |506.948 × (1 − 0,0010)           |506.441 kr.    |
-|**Depot ved månedsslut**              |                                 |**506.441 kr.**|
-|PAL-skat (bogholderi, ikke fratrukket)|(0,153 / 12) × (502.925 × 0,0080)|51 kr.         |
+|Trin                                  |Beregning                         |Resultat       |
+|--------------------------------------|----------------------------------|---------------|
+|Livsforsikringspræmie                 |500.000 × 0,00180 / 12            |75 kr.         |
+|Nettobidrag                           |500.000 + 3.000 − 75              |502.925 kr.    |
+|Efter afkast (0,80 %)                 |502.925 × 1,0080                  |506.948 kr.    |
+|Depotomkostning (0,10 %)              |506.948 × (1 − 0,0010)            |506.441 kr.    |
+|**Depot ved månedsslut**              |                                  |**506.441 kr.**|
+|PAL-skat (bogholderi, ikke fratrukket)|(0,153 / 12) × (502.925 × 0,0080) |51 kr.         |
+
+### Eksempel B — udbetalingsperiode, livrente (med dødelighedsgevinster, 1 måned)
+
+Antag: $D_0 = 2.000.000$ kr., alder 70 år, $\mu_{70} = 0{,}02$ pr. år (Gompertz-Makeham), $\alpha = 0{,}10\,\%$, $r_0 = 0{,}40\,\%$, månedlig ydelse $U = 12.000$ kr.
+
+|Trin                                       |Beregning                                            |Resultat          |
+|-------------------------------------------|-----------------------------------------------------|------------------|
+|Dødelighedsgevinst ($\mu_t = 0{,}02/12$)  |2.000.000 × (1 + 0,02/12)                           |2.003.333 kr.     |
+|Efter afkast (0,40 %)                      |2.003.333 × 1,0040                                   |2.011.347 kr.     |
+|Depotomkostning (0,10 %)                   |2.011.347 × (1 − 0,0010)                             |2.009.335 kr.     |
+|Udbetaling                                 |2.009.335 − 12.000                                   |1.997.335 kr.     |
+|**Depot ved månedsslut**                   |                                                     |**1.997.335 kr.** |
+|**Uden dødelighedsgevinst (fejl)**         |2.000.000 × 1,0040 × 0,9990 − 12.000                |**1.988.008 kr.** |
+
+Dødelighedsgevinsten bidrager med ca. **9.327 kr.** i dette eksempel — svarende til ca. 78 % af den månedlige ydelse. Ved høj alder, hvor $\mu_t$ er stor, kan gevinsten overstige ydelsen, hvilket er det aktuarmæssige grundlag for, at selskabet kan udbetale livrente på ubestemt tid.
 
 ### Sammenligning af produkternes mekanik
 
-|                            |Ratepension         |Livrente        |Aldersopsparing             |
-|----------------------------|--------------------|----------------|----------------------------|
-|Præmiefradrag               |Ja (op til loft)    |Ja (ubegrænset) |Nej                         |
-|PAL-skat                    |Ja                  |Ja              |Ja                          |
-|Udbetaling beskattet        |Ja                  |Ja              |Nej                         |
-|Udbetalingsform             |Rate over min. 10 år|Livsvarig ydelse|Rate eller engangsudbetaling|
-|Overlevelsesgevinster       |Nej                 |Ja              |Nej                         |
-|Depotopbygning (unit-linked)|Identisk            |Identisk        |Identisk                    |
+|                                        |Ratepension              |Livrente                     |Aldersopsparing             |
+|----------------------------------------|-------------------------|-----------------------------|----------------------------|
+|Præmiefradrag                           |Ja (op til loft)         |Ja (ubegrænset)              |Nej                         |
+|PAL-skat                                |Ja                       |Ja                           |Ja                          |
+|Udbetaling beskattet                    |Ja                       |Ja                           |Nej                         |
+|Udbetalingsform                         |Rate over min. 10 år     |Livsvarig ydelse             |Rate eller engangsudbetaling|
+|Overlevelsesgevinster (dødelighedsgevinster)|Nej                  |Ja — $+\mu_t D_t$ pr. måned  |Nej                         |
+|Fremregning i udbetalingsperioden       |$(1+r_t)$                |$(1+r_t+\mu_t)$              |$(1+r_t)$                   |
+|Depotopbygning i opsparingsperioden     |Identisk                 |Identisk                     |Identisk                    |
 
 Selve depotmekanikken er **identisk** for alle tre produkter. Forskellen ligger i skattebehandlingen af ind- og udbetalinger, i konverteringsreglerne ved pensionsalder — og for livrentens vedkommende i adgangen til overlevelsesgevinster, som er det aktuarmæssige fundament for produktets overlegenhed ved meget høj levealder.
 
